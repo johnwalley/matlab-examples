@@ -1,11 +1,9 @@
-function Ex = sequentialMonteCarloGPU(Np, N, resamplingThreshold, X0, s1, s2, k, th, T, ret, r)
+function Ex = sequentialMonteCarloCPU1(Np, N, resamplingThreshold, X0, s1, s2, k, th, T, ret, r)
 
     % Initialise particles
-    x = X0(2)*parallel.gpu.GPUArray.ones(Np,1);
-    x_new = parallel.gpu.GPUArray.ones(Np,1);
-    w = parallel.gpu.GPUArray.ones(Np,1)/Np;
-    
-    ret = gpuArray(ret);
+    x = X0(2)*ones(Np,1);
+    x_new = ones(Np,1);
+    w = ones(Np,1)/Np;
 
     Ex = [sum(w.*x); zeros(N,1)];
 
@@ -43,23 +41,34 @@ function Ex = sequentialMonteCarloGPU(Np, N, resamplingThreshold, X0, s1, s2, k,
 
         % Calculate effective sample size
         ess = 1./sum(w.^2);
-
-        if ess < resamplingThreshold*Np        
-            a = cumsum(w);
+        
+        if ess < resamplingThreshold*Np 
+            
+            u = sort(rand(Np, 1));
+            
+            j = 1;
+            t = u(1);
+            
             for n=1:Np
-%                 ind = find(rand<a,1,'first');
-                ind = 1;
-                while rand<a(ind)
-                    ind = ind + 1;
+                
+                mu = u(n);
+                
+                while u(n)<t                
+                    t = t + w(n);
+                    j = j + 1;               	
                 end
-                x_new(n,1) = x(ind);            
+                
+                x_new(n, 1) = x(j);
+                
             end
+            
             x = x_new;
-            w = ones(Np,1)/Np;
+            w = ones(Np, 1)/Np;
+            
         end
 
         Ex(ii) = sum(w.*x);
 
     end
 
-end % sequentialMonteCarloGPU
+end % sequentialMonteCarloCPU1

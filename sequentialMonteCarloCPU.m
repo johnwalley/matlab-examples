@@ -1,11 +1,9 @@
-function Ex = sequentialMonteCarloGPU(Np, N, resamplingThreshold, X0, s1, s2, k, th, T, ret, r)
+function Ex = sequentialMonteCarloCPU(Np, N, resamplingThreshold, X0, s1, s2, k, th, T, ret, r)
 
     % Initialise particles
-    x = X0(2)*parallel.gpu.GPUArray.ones(Np,1);
-    x_new = parallel.gpu.GPUArray.ones(Np,1);
-    w = parallel.gpu.GPUArray.ones(Np,1)/Np;
-    
-    ret = gpuArray(ret);
+    x = X0(2)*ones(Np,1);
+    x_new = ones(Np,1);
+    w = ones(Np,1)/Np;
 
     Ex = [sum(w.*x); zeros(N,1)];
 
@@ -47,11 +45,7 @@ function Ex = sequentialMonteCarloGPU(Np, N, resamplingThreshold, X0, s1, s2, k,
         if ess < resamplingThreshold*Np        
             a = cumsum(w);
             for n=1:Np
-%                 ind = find(rand<a,1,'first');
-                ind = 1;
-                while rand<a(ind)
-                    ind = ind + 1;
-                end
+                ind = find(rand<a,1,'first');
                 x_new(n,1) = x(ind);            
             end
             x = x_new;
@@ -62,4 +56,4 @@ function Ex = sequentialMonteCarloGPU(Np, N, resamplingThreshold, X0, s1, s2, k,
 
     end
 
-end % sequentialMonteCarloGPU
+end % sequentialMonteCarloCPU
