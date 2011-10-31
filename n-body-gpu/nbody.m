@@ -38,19 +38,22 @@ demo = init(demo, numBodies, useCpu);
 demo = reset(demo);
 
 if benchmark
+    
     if (numIterations <= 0) 
         numIterations = 10;
     end
     runBenchmark(demo, numIterations);
+    
 elseif compareToCpu
+    
     testResults = compareResults(demo, numBodies);
+    
 else
     
-    % Set up GUI
-    
-    % Start timer
+    demo.renderer.setDisplayFcn(@display);
     
     % GUI main loop
+    demo.renderer.mainLoop();
     
 end
 
@@ -58,8 +61,10 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
     function out = NBodyDemo
+        
         out = struct('nbody', 0, 'nbodyCuda', 0, 'nbodyCpu', 0, ...
                      'renderer', 0, 'hPos', 0, 'hVel', 0, 'hColor', 0);
+    
     end % NBodyDemo
 
     function out = init(out, numBodies, useCpu)
@@ -79,8 +84,8 @@ end
 
         % Create timer
 
-        if ~benchmark
-            out.renderer = ParticleRenderer;
+        if (~benchmark && ~compareToCpu)
+            out.renderer = ParticleRenderer(out);
             resetRenderer(out);
         end
 
@@ -105,6 +110,18 @@ end
         %obj.renderer.colors = obj.hColour;
 
     end % resetRenderer
+
+    function nbody = updateSimulation(nbody)
+        
+        nbody = nbody.update(activeParams.timestep);
+        
+    end % updateSimulation
+
+    function out = displayNBodySystem(out)
+        
+        demo.renderer.display;
+        
+    end % displayNBodySystem
 
     function passed = compareResults(out, numBodies)
 
@@ -160,11 +177,16 @@ end
                      interactionsPerSecond);
         fprintf('= %.3f GFLOP/s at %d flops per interaction\n', ...
                      gFlops, flopsPerInteraction);            
-    end        
+    
+    end % runBenchmark
 
     function display(out)
-        out.renderer.display();
-    end     
+        
+        out = updateSimulation(out);
+        
+        displayNBodySystem(out);
+        
+    end    
 
     function [interactionsPerSecond, gflops] = computePerfStats(milliseconds, ...
                                                                 iterations)
