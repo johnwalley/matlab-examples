@@ -74,7 +74,7 @@ else
             t = tic;
 
             [interactionsPerSecond, gflops] = computePerfStats( milliseconds, ...
-                                                                1)      
+                                                                1);      
              
             milliseconds = milliseconds / fpsCount;
             

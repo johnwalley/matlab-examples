@@ -88,13 +88,7 @@ classdef BodySystemCPU < BodySystem
 
             for i = 1:obj.numBodies
 
-                acc = zeros(1, 3);
-
-                for j = 1:obj.numBodies
-
-                    acc = BodySystemCPU.bodyBodyInteraction(acc, obj.pos(i, :), obj.pos(j, :), obj.mass(j), obj.softeningSquared);
-
-                end
+                acc = BodySystemCPU.bodyBodyInteraction(obj.pos(i, :), obj.pos, obj.mass, obj.softeningSquared);
 
                 obj.force(i, :) = acc;
 
@@ -118,28 +112,27 @@ classdef BodySystemCPU < BodySystem
     
     methods(Static)
         
-        function accel = bodyBodyInteraction(accel, pos1, pos2, mass2, ...
-                                             softeningSquared)
+        function accel = bodyBodyInteraction(pos1, pos2, mass2, softeningSquared)
         %BODYBODYINTERACTION calculates acceleration of body due to interaction
         %with another body and accumulates result
 
             % r_12
-            r = pos2 - pos1;
+            r = bsxfun(@minus, pos2, pos1);
 
             % d^2 + e^2
-            distSqr = norm(r);
+            distSqr = sum(r.^2, 2);
 
             distSqr = distSqr + softeningSquared;
 
             % invDistCube = 1/distSqr^(3/2)
-            invDist = 1.0 / sqrt(distSqr);
+            invDist = 1.0 ./ sqrt(distSqr);
             invDistCube = invDist.^3;
 
             % s = m_j * invDistCube
-            s = mass2 * invDistCube;
+            s = mass2 .* invDistCube;
 
             % (m_2 * r_12) / (d^2 + e^2)^(3/2)
-            accel = accel + r * s;
+            accel = sum(bsxfun(@times, r, s));
             
         end   
     
