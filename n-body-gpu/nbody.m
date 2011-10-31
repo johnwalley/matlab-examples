@@ -15,7 +15,10 @@ compareToCpu = false;
 
 flopsPerInteraction = 20;
 
-numBodies = 32;
+fpsCount = 0;
+fpsLimit = 5;
+
+numBodies = 16;
 numIterations = 0; % Run until exit
 
 demoParams = struct('timestep', {0.016, 0.016}, ...
@@ -42,21 +45,61 @@ if benchmark
     if (numIterations <= 0) 
         numIterations = 10;
     end
+    
     runBenchmark(demo, numIterations);
     
 elseif compareToCpu
     
     testResults = compareResults(demo, numBodies);
     
+    if testResults
+        fprintf('QA_PASSED');
+    else
+        fprintf('QA_FAILED');
+    end
+    
 else
     
-    demo.renderer.setDisplayFcn(@display);
+    t = tic;
     
-    % GUI main loop
-    demo.renderer.mainLoop();
-    
-end
+    for iStep = 1:2500
+        
+        demo = updateSimulation(demo);
+        
+        fpsCount = fpsCount + 1;
+        
+        if fpsCount >= fpsLimit        
+        
+            milliseconds = 1000.0 * toc(t);
+            t = tic;
 
+            [interactionsPerSecond, gflops] = computePerfStats( milliseconds, ...
+                                                                1)      
+             
+            milliseconds = milliseconds / fpsCount;
+            
+            ifps = 1 / (milliseconds / 1000);
+            
+            fps = sprintf('N-Body (%d bodies): %0.1f fps | %0.1f BIPS | %0.1f GFLOP/s', ...
+                           numBodies, ifps, interactionsPerSecond, gflops);
+     
+            demo.renderer.setWindowTitle(fps);
+            
+            fpsCount = 0; 
+            
+            if ifps > 1
+                fpsLimit = ifps;
+            else
+                fpsLimit = 1;
+            end
+            
+        end
+        
+        demo.renderer.pos = demo.nbody.pos;
+        demo.renderer.display();
+    end
+ 
+end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -85,7 +128,7 @@ end
         % Create timer
 
         if (~benchmark && ~compareToCpu)
-            out.renderer = ParticleRenderer(out);
+            out.renderer = ParticleRenderer(out.nbody.pos);
             resetRenderer(out);
         end
 
@@ -97,8 +140,8 @@ end
                                                activeParams.velocityScale, ...
                                                numBodies);    
         
-        out.pos = hPos;
-        out.vel = hVel;
+        out.nbody.pos = hPos;
+        out.nbody.vel = hVel;
 
     end % reset
 
@@ -111,17 +154,11 @@ end
 
     end % resetRenderer
 
-    function nbody = updateSimulation(nbody)
+    function out = updateSimulation(out)
         
-        nbody = nbody.update(activeParams.timestep);
+        out.nbody = out.nbody.update(activeParams.timestep);
         
     end % updateSimulation
-
-    function out = displayNBodySystem(out)
-        
-        demo.renderer.display;
-        
-    end % displayNBodySystem
 
     function passed = compareResults(out, numBodies)
 
@@ -143,27 +180,27 @@ end
 
         tolerance = 0.0005;
 
-        for i = 1:numBodies
+        for iBody = 1:numBodies
 
-            if abs(cpuPos(i) - cudaPos(i)) > tolerance
+            if abs(cpuPos(iBody) - cudaPos(iBody)) > tolerance
                 passed = false;
             end
 
         end
 
-    end
+    end % compareResults
 
     function runBenchmark(out, iterations)
 
         % Once without timing to prime device
         if ~useCpu
-            out.nbody.update(activeParams.timestep);
+            out.nbody = out.nbody.update(activeParams.timestep);
         end
 
         t = tic;
 
         for i = 1:iterations
-            out.nbody.update(activeParams.timestep);
+            out.nbody = out.nbody.update(activeParams.timestep);
         end
 
         milliseconds = toc(t);
@@ -179,14 +216,6 @@ end
                      gFlops, flopsPerInteraction);            
     
     end % runBenchmark
-
-    function display(out)
-        
-        out = updateSimulation(out);
-        
-        displayNBodySystem(out);
-        
-    end    
 
     function [interactionsPerSecond, gflops] = computePerfStats(milliseconds, ...
                                                                 iterations)
