@@ -74,7 +74,7 @@ classdef BodySystemArrayFun < BodySystem
             
             [a1, a2, a3] = arrayfun(@computeNBodyGravitation, p1, p1', p2, p2', p3, p3', m, s2);
  
-            force = 50 * [sum(a1, 2) sum(a2, 2) sum(a3, 2)];
+            force = 5 * [sum(a1, 2) sum(a2, 2) sum(a3, 2)];
             
             % acceleration = force / mass; 
             % new velocity = old velocity + acceleration * deltaTime

@@ -53,7 +53,7 @@ classdef ParticleRenderer < handle
             
             for iParticle = 1:size(pos, 1)
                 
-               h  = imshow( repmat(c, [1 1 3]), ...
+                h  = imshow( repmat(c, [1 1 3]), ...
                             'XData', [pos(iParticle, 1)-obj.spriteSize, pos(iParticle, 1)+obj.spriteSize], ...
                             'YData', [pos(iParticle, 2)-obj.spriteSize, pos(iParticle, 2)+obj.spriteSize], ...
                             'Parent', obj.Axes ); 
@@ -88,11 +88,15 @@ classdef ParticleRenderer < handle
         
         function drawPoints(obj, colour)
             
-            for iParticle = 1:size(obj.pos, 1)
+            [~, idx] = sort(obj.pos(:, 3));
+            
+            scaling = 0.1 + (-obj.pos(:, 3) + max(obj.pos(:, 3))  ) ./ (max(obj.pos(:, 3)) - min(obj.pos(:, 3)));
+            
+            for iParticle = 1:max(idx)
                 
                 set( obj.Particles(iParticle), ...
-                     'XData', [obj.pos(iParticle, 1)-obj.spriteSize, obj.pos(iParticle, 1)+obj.spriteSize], ...
-                     'YData', [obj.pos(iParticle, 2)-obj.spriteSize, obj.pos(iParticle, 2)+obj.spriteSize] );
+                     'XData', [obj.pos(idx(iParticle), 1)-scaling(idx(iParticle))*obj.spriteSize, obj.pos(idx(iParticle), 1)+scaling(idx(iParticle))*obj.spriteSize], ...
+                     'YData', [obj.pos(idx(iParticle), 2)-scaling(idx(iParticle))*obj.spriteSize, obj.pos(idx(iParticle), 2)+scaling(idx(iParticle))*obj.spriteSize] );
                                 
             end
  

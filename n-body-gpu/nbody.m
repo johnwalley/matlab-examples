@@ -6,6 +6,7 @@ p = inputParser;
 % Define inputs that default when not passed
 p.addParamValue('benchmark', false, @(x)islogical(x));
 p.addParamValue('useCpu', false, @(x)islogical(x));
+p.addParamValue('compareToCpu', false, @(x)islogical(x));
 
 p.addParamValue('numBodies', 32, @(x)isnumeric(x) && isscalar(x) && x>0);
 
@@ -13,7 +14,7 @@ p.parse(varargin{:});
 
 benchmark = p.Results.benchmark;
 useCpu = p.Results.useCpu;
-compareToCpu = false;
+compareToCpu = p.Results.compareToCpu;
 
 numBodies = p.Results.numBodies;
 
@@ -57,16 +58,16 @@ elseif compareToCpu
     testResults = compareResults(demo, numBodies);
     
     if testResults
-        fprintf('QA_PASSED');
+        fprintf('QA_PASSED\n');
     else
-        fprintf('QA_FAILED');
+        fprintf('QA_FAILED\n');
     end
     
 else
     
     t = tic;
     
-    for iStep = 1:500
+    for iStep = 1:1500
         
         demo = updateSimulation(demo);
         
@@ -140,12 +141,12 @@ end
 
     function out = reset(out)
 
-        [hPos, hVel, hColor] = randomiseBodies(activeParams.clusterScale, ...
+        [out.hPos, out.hVel, hColor] = randomiseBodies(activeParams.clusterScale, ...
                                                activeParams.velocityScale, ...
                                                numBodies);    
         
-        out.nbody.pos(:) = hPos;
-        out.nbody.vel(:) = hVel;
+        out.nbody.pos(:) = out.hPos;
+        out.nbody.vel(:) = out.hVel;
 
     end % reset
 
@@ -166,21 +167,21 @@ end
 
     function passed = compareResults(out, numBodies)
 
-        assert(out.nbodyGpu, 'GPU implementation must be initialised');
+        assert(out.nbodyGpu.initialised, 'GPU implementation must be initialised');
 
         passed = true;
 
-        out.nbody.update(0.001);
+        out.nbody = out.nbody.update(0.001);
 
-        out.nbodyCpu = BodySytemCPU(numBodies);
+        out.nbodyCpu = BodySystemCPU(numBodies);
 
         out.nbodyCpu.pos = out.hPos;
         out.nbodyCpu.vel = out.hVel;
 
-        out.nbodyCpu.update(0.001);
+        out.nbodyCpu = out.nbodyCpu.update(0.001);
 
-        cudaPos = nbodyGpu.pos;
-        cpuPos = nbodyCpu.pos;
+        cudaPos = out.nbody.pos;
+        cpuPos = out.nbodyCpu.pos;
 
         tolerance = 0.0005;
 
@@ -267,6 +268,9 @@ function [pos, vel, colour] = randomiseBodies(clusterScale, ...
         i = i + 1;
         
     end
+    
+    pos = bsxfun(@minus, pos, mean(pos));
+    vel = bsxfun(@minus, vel, mean(vel));
     
     if nargout >=3
         colour = rand(numBodies, 3);

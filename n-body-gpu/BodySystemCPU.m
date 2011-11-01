@@ -86,7 +86,7 @@ classdef BodySystemCPU < BodySystem
 
                 acc = BodySystemCPU.bodyBodyInteraction(obj.pos(i, :), obj.pos, obj.mass, obj.softeningSquared);
 
-                obj.force(i, :) = acc;
+                obj.force(i, :) = 5*acc;
 
             end
             
@@ -128,7 +128,7 @@ classdef BodySystemCPU < BodySystem
             s = mass2 .* invDistCube;
 
             % (m_2 * r_12) / (d^2 + e^2)^(3/2)
-            accel = 3*sum(bsxfun(@times, r, s));        
+            accel = sum(bsxfun(@times, r, s));        
             
         end % bodyBodyInteraction  
     
