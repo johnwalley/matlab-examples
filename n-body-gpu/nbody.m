@@ -3,9 +3,11 @@ function nbody(varargin)
 % Create an instance of the inputParser class.
 p = inputParser;
 
-% Define inputs that default when not passed:
+% Define inputs that default when not passed
 p.addParamValue('benchmark', false, @(x)islogical(x));
 p.addParamValue('useCpu', false, @(x)islogical(x));
+
+p.addParamValue('numBodies', 32, @(x)isnumeric(x) && isscalar(x) && x>0);
 
 p.parse(varargin{:});
 
@@ -13,23 +15,25 @@ benchmark = p.Results.benchmark;
 useCpu = p.Results.useCpu;
 compareToCpu = false;
 
+numBodies = p.Results.numBodies;
+
 flopsPerInteraction = 20;
 
 fpsCount = 0;
 fpsLimit = 5;
 
-numBodies = 16;
-numIterations = 0; % Run until exit
+
+numIterations = 10; % Run until exit
 
 demoParams = struct('timestep', {0.016, 0.016}, ...
-                     'clusterScale', {1.54, 0.68}, ...
-                     'velocityScale', {8.0, 20.0}, ...
-                     'softening', {0.1, 0.1}, ...
-                     'damping', {1.0, 1.0}, ...
-                     'pointSize', {1.0, 0.8}, ...
-                     'x', {0, 0}, ...
-                     'y', {-2, -2}, ...
-                     'z', {-100, -30});
+                    'clusterScale', {1.54, 0.68}, ...
+                    'velocityScale', {8.0, 20.0}, ...
+                    'softening', {0.1, 0.1}, ...
+                    'damping', {1.0, 1.0}, ...
+                    'pointSize', {1.0, 0.8}, ...
+                    'x', {0, 0}, ...
+                    'y', {-2, -2}, ...
+                    'z', {-100, -30});
                 
 numDemos = numel(demoParams);
 activeDemo = 1;                  
@@ -62,7 +66,7 @@ else
     
     t = tic;
     
-    for iStep = 1:2500
+    for iStep = 1:500
         
         demo = updateSimulation(demo);
         
@@ -81,7 +85,7 @@ else
             ifps = 1 / (milliseconds / 1000);
             
             fps = sprintf('N-Body (%d bodies): %0.1f fps | %0.1f BIPS | %0.1f GFLOP/s', ...
-                           numBodies, ifps, interactionsPerSecond, gflops);
+                           numBodies, ifps, 1e3*interactionsPerSecond, 1e3*gflops);
      
             demo.renderer.setWindowTitle(fps);
             
@@ -95,7 +99,7 @@ else
             
         end
         
-        demo.renderer.pos = demo.nbody.pos;
+        demo.renderer.pos = gather(demo.nbody.pos);
         demo.renderer.display();
     end
  
@@ -105,7 +109,7 @@ end
 
     function out = NBodyDemo
         
-        out = struct('nbody', 0, 'nbodyCuda', 0, 'nbodyCpu', 0, ...
+        out = struct('nbody', 0, 'nbodyGpu', 0, 'nbodyCpu', 0, ...
                      'renderer', 0, 'hPos', 0, 'hVel', 0, 'hColor', 0);
     
     end % NBodyDemo
@@ -115,10 +119,10 @@ end
         if useCpu
             out.nbodyCpu = BodySystemCPU(numBodies);
             out.nbody = out.nbodyCpu;
-            out.nbodyCuda = 0;
+            out.nbodyGpu = 0;
         else
-            out.nbodyCpu = BodySystemCUDA(numBodies);
-            out.nbody = out.nbodyCuda;
+            out.nbodyGpu = BodySystemArrayFun(numBodies);
+            out.nbody = out.nbodyGpu;
             out.nbodyCpu = 0;
         end
 
@@ -128,7 +132,7 @@ end
         % Create timer
 
         if (~benchmark && ~compareToCpu)
-            out.renderer = ParticleRenderer(out.nbody.pos);
+            out.renderer = ParticleRenderer(gather(out.nbody.pos));
             resetRenderer(out);
         end
 
@@ -140,8 +144,8 @@ end
                                                activeParams.velocityScale, ...
                                                numBodies);    
         
-        out.nbody.pos = hPos;
-        out.nbody.vel = hVel;
+        out.nbody.pos(:) = hPos;
+        out.nbody.vel(:) = hVel;
 
     end % reset
 
@@ -162,7 +166,7 @@ end
 
     function passed = compareResults(out, numBodies)
 
-        assert(out.nbodyCuda, 'CUDA implementation must be initialised');
+        assert(out.nbodyGpu, 'GPU implementation must be initialised');
 
         passed = true;
 
@@ -175,7 +179,7 @@ end
 
         out.nbodyCpu.update(0.001);
 
-        cudaPos = nbodyCuda.pos;
+        cudaPos = nbodyGpu.pos;
         cpuPos = nbodyCpu.pos;
 
         tolerance = 0.0005;
@@ -203,7 +207,7 @@ end
             out.nbody = out.nbody.update(activeParams.timestep);
         end
 
-        milliseconds = toc(t);
+        milliseconds = 1000.0 * toc(t);
 
         [interactionsPerSecond, gFlops] = computePerfStats(milliseconds, ...
                                                            iterations);

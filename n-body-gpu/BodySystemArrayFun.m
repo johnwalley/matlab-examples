@@ -1,5 +1,5 @@
-classdef BodySystemCPU < BodySystem
-    %BodySystemCPU Summary of this class goes here
+classdef BodySystemArrayFun < BodySystem
+    %BODYSYSTEMARRAYFUN Summary of this class goes here
     %   Detailed explanation goes here
     
     properties
@@ -24,7 +24,7 @@ classdef BodySystemCPU < BodySystem
     
     methods
         
-        function obj = BodySystemCPU(numBodies)
+        function obj = BodySystemArrayFun(numBodies)
            
             obj.initialised = false;
             obj.force = 0;
@@ -41,11 +41,11 @@ classdef BodySystemCPU < BodySystem
             
             obj.numBodies = numBodies;
             
-            obj.pos = zeros(obj.numBodies, 3);
-            obj.vel = zeros(obj.numBodies, 3);
-            obj.force = zeros(obj.numBodies, 3);
+            obj.pos = parallel.gpu.GPUArray.zeros(obj.numBodies, 3);
+            obj.vel = parallel.gpu.GPUArray.zeros(obj.numBodies, 3);
+            obj.force = parallel.gpu.GPUArray.zeros(obj.numBodies, 3);
             
-            obj.mass = ones(obj.numBodies, 1);
+            obj.mass = parallel.gpu.GPUArray.ones(obj.numBodies, 1);
             obj.invMass = 1 ./ obj.mass;
             
             obj.initialised = true;            
@@ -63,12 +63,22 @@ classdef BodySystemCPU < BodySystem
         function obj = integrateNBodySystem(obj, deltaTime)
         %INTEGRATENBODYSYSTEM performs a single integration for the time period
         %deltaTime
-
-            obj = obj.computeNBodyGravitation();
+            
+            p1 = repmat(obj.pos(:, 1), 1, obj.numBodies);
+            p2 = repmat(obj.pos(:, 2), 1, obj.numBodies);
+            p3 = repmat(obj.pos(:, 3), 1, obj.numBodies);
+        
+            m = repmat(obj.mass, 1, obj.numBodies);
+            
+            s2 = obj.softeningSquared;
+            
+            [a1, a2, a3] = arrayfun(@computeNBodyGravitation, p1, p1', p2, p2', p3, p3', m, s2);
  
+            force = 50 * [sum(a1, 2) sum(a2, 2) sum(a3, 2)];
+            
             % acceleration = force / mass; 
             % new velocity = old velocity + acceleration * deltaTime
-            obj.vel = obj.vel + bsxfun(@times, obj.force, obj.invMass) * deltaTime;
+            obj.vel = obj.vel + force .* repmat(obj.invMass, 1, 3) * deltaTime;
 
             obj.vel = obj.vel * obj.damping;
 
@@ -76,22 +86,7 @@ classdef BodySystemCPU < BodySystem
             obj.pos = obj.pos + obj.vel * deltaTime;
             
         end % integrateNBodySystem
-        
-        function obj = computeNBodyGravitation(obj)
-        %COMPUTENBODYGRAVITATION calculates the force on each body
-
-            obj.force = zeros(obj.numBodies, 3);
-
-            for i = 1:obj.numBodies
-
-                acc = BodySystemCPU.bodyBodyInteraction(obj.pos(i, :), obj.pos, obj.mass, obj.softeningSquared);
-
-                obj.force(i, :) = acc;
-
-            end
-            
-        end % computeNBodyGravitation   
-        
+                
         function obj = set.softening(obj, softening)
            
             obj.softeningSquared = softening^2;
@@ -105,33 +100,5 @@ classdef BodySystemCPU < BodySystem
         end % get.softening        
         
     end % methods
-    
-    methods(Static)
         
-        function accel = bodyBodyInteraction(pos1, pos2, mass2, softeningSquared)
-        %BODYBODYINTERACTION calculates acceleration of body due to interaction
-        %with another body and accumulates result
-
-            % r_12
-            r = bsxfun(@minus, pos2, pos1);
-
-            % d^2 + e^2
-            distSqr = sum(r.^2, 2);
-
-            distSqr = distSqr + softeningSquared;
-
-            % invDistCube = 1/distSqr^(3/2)
-            invDist = 1.0 ./ sqrt(distSqr);
-            invDistCube = invDist.^3;
-
-            % s = m_j * invDistCube
-            s = mass2 .* invDistCube;
-
-            % (m_2 * r_12) / (d^2 + e^2)^(3/2)
-            accel = 3*sum(bsxfun(@times, r, s));        
-            
-        end % bodyBodyInteraction  
-    
-    end % methods(Static)
-    
 end
